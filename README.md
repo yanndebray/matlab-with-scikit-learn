@@ -44,30 +44,28 @@ that dataset. Updated automatically by CI.
 
 MATLAB drives the pipeline; Python is invoked through MATLAB's `py.*` interop:
 
-```
-MATLAB                                 Python (compare.py)
-──────                                 ───────────────────
-                       cmp.dataset_keys()
-                  ──────────────────────────►
-                  ◄──────────────────────────  ['iris', 'wine', ...]
+```mermaid
+sequenceDiagram
+    autonumber
+    participant M as MATLAB<br/>(callPython.m)
+    participant P as Python<br/>(compare.py)
 
-  for each dataset:
-                       cmp.get_split(name)
-                  ──────────────────────────►
-                  ◄──────────────────────────  (X_train, X_test, y_train, y_test)
+    M->>P: cmp.dataset_keys()
+    P-->>M: ['iris', 'wine', 'breast_cancer', 'digits']
 
-    fitcecoc / fitctree / TreeBagger / fitcknn  ─► matlab_preds[name][clf] = y_pred
+    loop for each dataset
+        M->>P: cmp.get_split(name)
+        P-->>M: (X_train, X_test, y_train, y_test)
+        Note over M: fitcecoc · fitctree<br/>TreeBagger(50) · fitcknn(k=5)
+        M->>M: collect predictions
+    end
 
-                       cmp.render_all(all_preds)
-                  ──────────────────────────►
-                                                  trains sklearn fleet,
-                                                  builds skore EstimatorReport
-                                                  for each model, builds
-                                                  ComparisonReport per dataset,
-                                                  renders multi-section site/.
+    M->>P: cmp.render_all(all_preds)
+    Note over P: train sklearn fleet<br/>build skore EstimatorReports<br/>build ComparisonReport per dataset<br/>render multi-section site/
+    P-->>M: index_path
 ```
 
-The CI job installs MATLAB R2025b via `matlab-actions/setup-matlab`, runs
+CI installs MATLAB R2025b via `matlab-actions/setup-matlab`, runs
 `callPython.m` via `matlab-actions/run-command`, then `actions/deploy-pages`
 publishes `site/` to GitHub Pages.
 
