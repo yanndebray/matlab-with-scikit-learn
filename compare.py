@@ -72,6 +72,6 @@ def compare(X_train, X_test, y_train, y_test, y_pred_matlab):
             "MATLAB fitcecoc": ml_report,
         }
     )
-    metrics = comparison.metrics.report_metrics()
+    metrics = comparison.metrics
     print(metrics)
     return metrics
