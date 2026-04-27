@@ -68,6 +68,19 @@ jobs:
         with:
           command: callPython
 
+      # Step 4b — Show what MATLAB produced so a missing site/ is obvious in the log.
+      - name: List workspace after MATLAB run
+        if: always()
+        run: |
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE"
+          if [ -d "$GITHUB_WORKSPACE/site" ]; then
+            echo "site/ contents:"
+            ls -la "$GITHUB_WORKSPACE/site"
+          else
+            echo "site/ does not exist"
+          fi
+
       # Step 5 — Keep the rendered report visible on every run as a downloadable
       # build artifact, even on PRs where Pages deployment is skipped.
       - name: Upload site as build artifact
@@ -75,6 +88,7 @@ jobs:
         with:
           name: skore-report
           path: site
+          if-no-files-found: error
 
       # Step 6 — Publish to GitHub Pages on main only. Configure the repository's
       # Pages source as "GitHub Actions" (Settings → Pages) for this to work.

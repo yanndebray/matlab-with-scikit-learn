@@ -170,8 +170,12 @@ def _render_html(output_dir, y_test, model_predictions, skore_table_html):
 
 
 def compare(
-    X_train, X_test, y_train, y_test, y_pred_matlab, output_dir="site"
+    X_train, X_test, y_train, y_test, y_pred_matlab, output_dir=None
 ):
+    if output_dir is None:
+        output_dir = Path(__file__).resolve().parent / "site"
+    output_dir = Path(output_dir).resolve()
+
     X_train = np.asarray(X_train, dtype=float)
     X_test = np.asarray(X_test, dtype=float)
     y_train = np.asarray(y_train).ravel().astype(int)

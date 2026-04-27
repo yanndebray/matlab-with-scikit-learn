@@ -29,8 +29,16 @@ y_pred_matlab = predict(mdl, X_test);
 fprintf('MATLAB fitcecoc accuracy: %.4f\n', mean(y_pred_matlab(:) == y_test(:)));
 
 % Round-trip predictions through numpy so compare.py sees a 1-D int array.
-% The output_dir is what the GitHub Pages step uploads as the site.
+% Pin output_dir to <repo>/site using an absolute path so it lands in the same
+% place regardless of MATLAB's CWD (matlab-actions/run-command swaps it around).
+repo_root = getenv('GITHUB_WORKSPACE');
+if isempty(repo_root)
+    repo_root = pwd;
+end
+site_dir = fullfile(repo_root, 'site');
+fprintf('Writing skore site to: %s\n', site_dir);
+
 index_path = cmp.compare(X_train_py, X_test_py, y_train_py, y_test_py, ...
-    py.numpy.array(y_pred_matlab(:)), pyargs('output_dir', 'site'));
+    py.numpy.array(y_pred_matlab(:)), pyargs('output_dir', site_dir));
 
 fprintf('Skore HTML report written to: %s\n', char(index_path));
