@@ -6,6 +6,17 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Needed for the deploy-pages step.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Avoid concurrent Pages deployments stomping on each other.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   interop:
     runs-on: ubuntu-latest
@@ -17,6 +28,12 @@ jobs:
     #  MATHWORKS_ACCOUNT: ${{ secrets.MATHWORKS_ACCOUNT }}
     #  MATHWORKS_TOKEN:   ${{ secrets.MATHWORKS_TOKEN }}
     #  MLM_LICENSE_FILE:  ${{ secrets.MLM_LICENSE_FILE }}
+
+    # The Pages environment is bound at the job level so the deployment URL
+    # surfaces in the Actions UI.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout repository
@@ -32,7 +49,7 @@ jobs:
       # Step 2 — Install Python packages BEFORE MATLAB starts so they are
       # importable the first time MATLAB loads the Python interpreter.
       - name: Install Python dependencies
-        run: python3 -m pip install --upgrade pip scikit-learn numpy skore
+        run: python3 -m pip install --upgrade pip scikit-learn numpy matplotlib skore
 
       # Step 3 — Install MATLAB R2025b. The matlab-actions stack handles
       # licensing on github-hosted runners for public repos via the
@@ -45,10 +62,47 @@ jobs:
           cache: true
 
       # Step 4 — Run MATLAB, which in turn calls into scikit-learn via py.*.
-      # run-command is what activates the license, and the same MATLAB process
-      # then drives Python — so licensing is the very first thing that happens
-      # when MATLAB starts.
-      - name: Run MATLAB script (calls Python)
+      # The MATLAB script writes the rendered HTML report under ./site.
+      - name: Run MATLAB script (calls Python and builds site/)
         uses: matlab-actions/run-command@v2
         with:
           command: callPython
+
+      # Step 4b — Show what MATLAB produced so a missing site/ is obvious in the log.
+      - name: List workspace after MATLAB run
+        if: always()
+        run: |
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE"
+          if [ -d "$GITHUB_WORKSPACE/site" ]; then
+            echo "site/ contents:"
+            ls -la "$GITHUB_WORKSPACE/site"
+          else
+            echo "site/ does not exist"
+          fi
+
+      # Step 5 — Keep the rendered report visible on every run as a downloadable
+      # build artifact, even on PRs where Pages deployment is skipped.
+      - name: Upload site as build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: skore-report
+          path: site
+          if-no-files-found: error
+
+      # Step 6 — Publish to GitHub Pages on main only. Configure the repository's
+      # Pages source as "GitHub Actions" (Settings → Pages) for this to work.
+      - name: Configure GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/deploy-pages@v4
