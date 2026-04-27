@@ -32,7 +32,7 @@ jobs:
       # Step 2 — Install Python packages BEFORE MATLAB starts so they are
       # importable the first time MATLAB loads the Python interpreter.
       - name: Install Python dependencies
-        run: python3 -m pip install --upgrade pip scikit-learn numpy
+        run: python3 -m pip install --upgrade pip scikit-learn numpy skore
 
       # Step 3 — Install MATLAB R2025b. The matlab-actions stack handles
       # licensing on github-hosted runners for public repos via the

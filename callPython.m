@@ -1,30 +1,36 @@
-% callPython.m — Demonstrate calling Python (scikit-learn) from MATLAB.
-% Trains a logistic regression on the Iris dataset entirely through Python,
-% then converts the resulting accuracy back to a MATLAB double.
+% callPython.m — Train a MATLAB classifier and compare it against
+% sklearn's LogisticRegression using skore.
+%
+% MATLAB drives the whole workflow:
+%   1. Ask Python (via compare.py) for the same Iris train/test split sklearn uses.
+%   2. Train fitcecoc on that split here in MATLAB.
+%   3. Hand both halves and the MATLAB predictions back to compare.py, which
+%      builds two skore EstimatorReports and a ComparisonReport.
 
 disp('Calling Python from MATLAB in a GitHub Action!');
 disp(pyenv);
 
-np      = py.importlib.import_module('numpy');
-datasets = py.importlib.import_module('sklearn.datasets');
-modelsel = py.importlib.import_module('sklearn.model_selection');
-linmod   = py.importlib.import_module('sklearn.linear_model');
-metrics  = py.importlib.import_module('sklearn.metrics');
+cmp = py.importlib.import_module('compare');
+py.importlib.reload(cmp);
 
-% return_X_y=True so we get a plain (X, y) tuple instead of an
-% sklearn Bunch (whose attribute access doesn't surface through MATLAB's py.*).
-iris = datasets.load_iris(pyargs('return_X_y', true));
-X = iris{1}; y = iris{2};
-split = modelsel.train_test_split(X, y, ...
-    pyargs('test_size', 0.25, 'random_state', int32(0)));
-X_train = split{1}; X_test = split{2};
-y_train = split{3}; y_test = split{4};
+split = cmp.make_split();
+X_train_py = split{1}; X_test_py = split{2};
+y_train_py = split{3}; y_test_py = split{4};
 
-clf = linmod.LogisticRegression(pyargs('max_iter', int32(200)));
-clf.fit(X_train, y_train);
-y_pred = clf.predict(X_test);
+% Convert numpy arrays into MATLAB doubles for the Statistics & ML toolbox.
+X_train = double(X_train_py);
+X_test  = double(X_test_py);
+y_train = double(y_train_py);
+y_test  = double(y_test_py);
 
-accuracy = double(metrics.accuracy_score(y_test, y_pred));
-fprintf('Logistic regression accuracy on Iris (from MATLAB): %.4f\n', accuracy);
+mdl = fitcecoc(X_train, y_train);
+y_pred_matlab = predict(mdl, X_test);
 
-assert(accuracy > 0.8, 'Expected accuracy > 0.8 from sklearn.LogisticRegression');
+fprintf('MATLAB fitcecoc accuracy: %.4f\n', mean(y_pred_matlab(:) == y_test(:)));
+
+% Round-trip predictions through numpy so compare.py sees a 1-D int array.
+metrics = cmp.compare(X_train_py, X_test_py, y_train_py, y_test_py, ...
+    py.numpy.array(y_pred_matlab(:)));
+
+disp('skore ComparisonReport metrics:');
+disp(metrics);
