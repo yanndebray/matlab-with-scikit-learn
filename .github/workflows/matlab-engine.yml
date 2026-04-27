@@ -1,0 +1,103 @@
+name: MATLAB Engine for Python
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  matlab-from-python:
+    runs-on: ubuntu-latest
+
+    # Make any MathWorks licensing credentials available to every step that may
+    # launch MATLAB (the setup action and the bash step that backgrounds matlab).
+    # Configure at least one of these as repository secrets:
+    #   - MATHWORKS_ACCOUNT + MATHWORKS_TOKEN  (online batch licensing token)
+    #   - MLM_LICENSE_FILE                     (network license manager: PORT@HOST)
+    env:
+      MATHWORKS_ACCOUNT: ${{ secrets.MATHWORKS_ACCOUNT }}
+      MATHWORKS_TOKEN:   ${{ secrets.MATHWORKS_TOKEN }}
+      MLM_LICENSE_FILE:  ${{ secrets.MLM_LICENSE_FILE }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Step 1 — Install MATLAB R2025b FIRST.
+      # This puts `matlab` on PATH and prepares the runtime libraries the
+      # `matlabengine` wheel will bind against. It must run before any step that
+      # launches MATLAB so that licensing inputs above are picked up by the very
+      # first MATLAB process — that first process is what activates the license
+      # for the rest of the job.
+      - name: Set up MATLAB R2025b
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: R2025b
+          products: Statistics_and_Machine_Learning_Toolbox
+          cache: true
+
+      # Step 2 — Start MATLAB and share the engine BEFORE installing the Python
+      # package. This is the first MATLAB invocation, so this is when the license
+      # is checked out. We background it with nohup so the rest of the job runs
+      # while MATLAB stays alive, and we wait for the "SHARED" sentinel to make
+      # sure the engine is registered with the OS before Python tries to find it.
+      - name: Start and share MATLAB engine in background
+        shell: bash
+        run: |
+          nohup matlab -batch \
+            "matlab.engine.shareEngine('CIEngine'); disp('SHARED'); pause(Inf)" \
+            > matlab_engine.log 2>&1 &
+          echo $! > matlab.pid
+          for i in $(seq 1 60); do
+            if grep -q "SHARED" matlab_engine.log 2>/dev/null; then
+              echo "Shared MATLAB session 'CIEngine' is ready."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for MATLAB engine to share."
+          cat matlab_engine.log
+          exit 1
+
+      # Step 3 — Install the matlabengine pip package whose major version matches
+      # MATLAB R2025b (25.2.x). Doing this AFTER MATLAB is installed and licensed
+      # means the wheel can find the matching MATLAB runtime when imported.
+      - name: Install MATLAB Engine for Python and project deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "matlabengine==25.2.*" scikit-learn numpy
+
+      # Step 4 — Connect from Python to the already-shared, already-licensed MATLAB
+      # session and exercise the bridge.
+      - name: Call MATLAB from Python
+        shell: python
+        run: |
+          import matlab.engine
+
+          sessions = matlab.engine.find_matlab()
+          print("Discoverable MATLAB sessions:", sessions)
+          assert "CIEngine" in sessions, "Shared engine 'CIEngine' not found"
+
+          eng = matlab.engine.connect_matlab("CIEngine")
+          print("sqrt(16) ->", eng.sqrt(16.0))
+          eng.eval("disp('Hello from MATLAB, called by Python')", nargout=0)
+          # Do not call eng.quit(): that would terminate the shared session and
+          # the cleanup step handles shutdown.
+
+      - name: Stop MATLAB engine
+        if: always()
+        shell: bash
+        run: |
+          if [ -f matlab.pid ]; then
+            kill "$(cat matlab.pid)" 2>/dev/null || true
+          fi
+          if [ -f matlab_engine.log ]; then
+            echo "----- matlab_engine.log -----"
+            tail -n 200 matlab_engine.log
+          fi
