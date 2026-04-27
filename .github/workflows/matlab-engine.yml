@@ -15,10 +15,10 @@ jobs:
     # Configure at least one of these as repository secrets:
     #   - MATHWORKS_ACCOUNT + MATHWORKS_TOKEN  (online batch licensing token)
     #   - MLM_LICENSE_FILE                     (network license manager: PORT@HOST)
-    env:
-      MATHWORKS_ACCOUNT: ${{ secrets.MATHWORKS_ACCOUNT }}
-      MATHWORKS_TOKEN:   ${{ secrets.MATHWORKS_TOKEN }}
-      MLM_LICENSE_FILE:  ${{ secrets.MLM_LICENSE_FILE }}
+    #env:
+    #  MATHWORKS_ACCOUNT: ${{ secrets.MATHWORKS_ACCOUNT }}
+    #  MATHWORKS_TOKEN:   ${{ secrets.MATHWORKS_TOKEN }}
+    #  MLM_LICENSE_FILE:  ${{ secrets.MLM_LICENSE_FILE }}
 
     steps:
       - name: Checkout repository
