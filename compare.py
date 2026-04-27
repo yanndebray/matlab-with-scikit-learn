@@ -21,6 +21,7 @@ from sklearn.datasets import load_iris
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
+    accuracy_score,
     classification_report,
     confusion_matrix,
 )
@@ -84,13 +85,35 @@ def _render_html(output_dir, y_test, model_predictions, skore_table_html):
         ConfusionMatrixDisplay(cm).plot(ax=ax, colorbar=False, cmap="Blues")
         ax.set_title(name)
     fig.tight_layout()
-    fig.savefig(output_dir / "confusion_matrices.png", dpi=140, bbox_inches="tight")
+    fig.savefig(
+        output_dir / "confusion_matrices.png",
+        dpi=140,
+        bbox_inches="tight",
+        transparent=True,
+    )
     plt.close(fig)
 
     classification_blocks = []
+    accuracies = {}
     for name, y_pred in model_predictions.items():
+        accuracies[name] = accuracy_score(y_test, y_pred)
         report_text = classification_report(y_test, y_pred, digits=4)
         classification_blocks.append(f"<h3>{name}</h3><pre>{report_text}</pre>")
+
+    best = max(accuracies, key=accuracies.get)
+    score_cards = "".join(
+        f"""<div class="card{' winner' if name == best else ''}">
+              <div class="card-label">{name}</div>
+              <div class="card-value">{acc:.2%}</div>
+              <div class="card-sub">accuracy on {len(y_test)} test samples</div>
+            </div>"""
+        for name, acc in accuracies.items()
+    )
+    if len(set(accuracies.values())) == 1:
+        verdict = "Both classifiers agree on every test sample."
+    else:
+        delta = accuracies[best] - min(accuracies.values())
+        verdict = f"<strong>{best}</strong> leads by {delta:.2%}."
 
     metrics_section = (
         skore_table_html
@@ -103,62 +126,183 @@ def _render_html(output_dir, y_test, model_predictions, skore_table_html):
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MATLAB vs scikit-learn — skore comparison</title>
   <style>
-    :root {{ color-scheme: light dark; }}
+    :root {{
+      color-scheme: light dark;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --panel-alt: #f3f5f9;
+      --ink: #1c2230;
+      --muted: #5b6478;
+      --line: #e6e9ef;
+      --accent: #4f46e5;
+      --accent-soft: #eef0ff;
+      --gold: #d4a017;
+      --shadow: 0 1px 3px rgba(15,20,40,0.06), 0 8px 24px rgba(15,20,40,0.04);
+    }}
+    @media (prefers-color-scheme: dark) {{
+      :root {{
+        --bg: #0f1320;
+        --panel: #161b2c;
+        --panel-alt: #1d2338;
+        --ink: #e7eaf3;
+        --muted: #99a1b8;
+        --line: #262d44;
+        --accent: #8b8cf7;
+        --accent-soft: #1f2342;
+        --gold: #f1c453;
+        --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 12px 28px rgba(0,0,0,0.35);
+      }}
+    }}
+    * {{ box-sizing: border-box; }}
     body {{
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      max-width: 960px;
-      margin: 2.5rem auto;
-      padding: 0 1.25rem;
-      line-height: 1.55;
-      color: #222;
-      background: #fafafa;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+      line-height: 1.6;
+      color: var(--ink);
+      background: var(--bg);
     }}
-    h1 {{ border-bottom: 2px solid #e3e3e3; padding-bottom: 0.5rem; }}
-    h2 {{ margin-top: 2.25rem; }}
+    .header {{
+      display: flex;
+      align-items: baseline;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.5rem;
+    }}
+    .header h1 {{ margin: 0; font-size: 1.85rem; letter-spacing: -0.01em; }}
+    .badge {{
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-weight: 600;
+    }}
+    .lede {{ color: var(--muted); margin: 0.25rem 0 2rem; max-width: 60ch; }}
+    h2 {{
+      margin: 2.5rem 0 1rem;
+      font-size: 1.15rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }}
+    h3 {{ margin: 1.5rem 0 0.5rem; font-size: 1rem; }}
     code, pre {{
       font-family: "SF Mono", "Menlo", "Consolas", monospace;
-      background: #f0f0f0;
+      background: var(--panel-alt);
       border-radius: 4px;
     }}
-    pre {{ padding: 0.75rem 1rem; overflow-x: auto; }}
+    code {{ padding: 0.05rem 0.35rem; font-size: 0.9em; }}
+    pre {{
+      padding: 0.9rem 1.1rem;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }}
+    .scoreboard {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 0 0 0.5rem;
+    }}
+    .card {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }}
+    .card.winner {{ border-color: var(--gold); }}
+    .card.winner::after {{
+      content: "best";
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }}
+    .card-label {{ color: var(--muted); font-size: 0.85rem; font-weight: 500; }}
+    .card-value {{
+      font-size: 2.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0.35rem 0 0.1rem;
+      font-variant-numeric: tabular-nums;
+    }}
+    .card-sub {{ color: var(--muted); font-size: 0.8rem; }}
+    .verdict {{
+      margin: 1rem 0 0;
+      padding: 0.75rem 1rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }}
+    .panel {{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+    }}
     table.metrics {{
       border-collapse: collapse;
       width: 100%;
-      background: white;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-      border-radius: 6px;
-      overflow: hidden;
+      font-variant-numeric: tabular-nums;
     }}
     table.metrics th, table.metrics td {{
       padding: 0.55rem 0.85rem;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid var(--line);
       text-align: right;
     }}
-    table.metrics th {{ background: #f5f7fa; font-weight: 600; }}
+    table.metrics th {{ font-weight: 600; color: var(--muted); }}
+    table.metrics tr:last-child td {{ border-bottom: none; }}
     table.metrics tr td:first-child, table.metrics tr th:first-child {{ text-align: left; }}
-    img {{ max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
-    footer {{ margin-top: 3rem; color: #777; font-size: 0.9rem; }}
-    a {{ color: #0a66c2; }}
+    img {{ max-width: 100%; height: auto; border-radius: 8px; }}
+    footer {{
+      margin-top: 3.5rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--line);
+      padding-top: 1rem;
+    }}
+    a {{ color: var(--accent); }}
   </style>
 </head>
 <body>
-  <h1>MATLAB vs scikit-learn — <em>skore</em> comparison</h1>
-  <p>
-    Iris classification: <code>fitcecoc</code> (MATLAB R2025b, Statistics &amp; ML Toolbox)
+  <div class="header">
+    <h1>MATLAB vs scikit-learn</h1>
+    <span class="badge">skore comparison</span>
+  </div>
+  <p class="lede">
+    Iris classification — <code>fitcecoc</code> (MATLAB R2025b, Statistics &amp; ML Toolbox)
     versus <code>LogisticRegression</code> (scikit-learn), placed side-by-side with
     <a href="https://skore.probabl.ai">skore</a>.
   </p>
 
+  <div class="scoreboard">{score_cards}</div>
+  <p class="verdict">{verdict}</p>
+
   <h2>Metrics</h2>
-  {metrics_section}
+  <div class="panel">{metrics_section}</div>
 
   <h2>Confusion matrices</h2>
-  <img src="confusion_matrices.png" alt="Confusion matrices for each model">
+  <div class="panel"><img src="confusion_matrices.png" alt="Confusion matrices for each model"></div>
 
   <h2>Classification reports</h2>
-  {''.join(classification_blocks)}
+  <div class="panel">{''.join(classification_blocks)}</div>
 
   <footer>Built {timestamp} by GitHub Actions.</footer>
 </body>
