@@ -51,7 +51,7 @@ sequenceDiagram
     participant P as Python<br/>(compare.py)
 
     M->>P: cmp.dataset_keys()
-    P-->>M: ['iris', 'wine', 'breast_cancer', 'digits']
+    P-->>M: list of dataset names (iris, wine, breast_cancer, digits)
 
     loop for each dataset
         M->>P: cmp.get_split(name)
