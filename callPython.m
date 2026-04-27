@@ -11,8 +11,11 @@ modelsel = py.importlib.import_module('sklearn.model_selection');
 linmod   = py.importlib.import_module('sklearn.linear_model');
 metrics  = py.importlib.import_module('sklearn.metrics');
 
-iris = datasets.load_iris();
-split = modelsel.train_test_split(iris.data, iris.target, ...
+% return_X_y=True so we get a plain (X, y) tuple instead of an
+% sklearn Bunch (whose attribute access doesn't surface through MATLAB's py.*).
+iris = datasets.load_iris(pyargs('return_X_y', true));
+X = iris{1}; y = iris{2};
+split = modelsel.train_test_split(X, y, ...
     pyargs('test_size', 0.25, 'random_state', int32(0)));
 X_train = split{1}; X_test = split{2};
 y_train = split{3}; y_test = split{4};
