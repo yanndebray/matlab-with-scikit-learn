@@ -2,6 +2,7 @@
 
 [![Call Python from MATLAB](https://github.com/yanndebray/matlab-with-scikit-learn/actions/workflows/matlab-engine.yml/badge.svg)](https://github.com/yanndebray/matlab-with-scikit-learn/actions/workflows/matlab-engine.yml)
 [![Live report](https://img.shields.io/badge/live%20report-yanndebray.github.io-4f46e5)](https://yanndebray.github.io/matlab-with-scikit-learn/)
+[![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=yanndebray/matlab-with-scikit-learn)
 
 > **A skore benchmark across 4 datasets and 8 classifiers.**
 > MATLAB R2025b's Statistics & ML Toolbox squares off against scikit-learn on
