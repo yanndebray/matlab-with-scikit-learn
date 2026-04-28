@@ -1,4 +1,4 @@
-# MATLAB vs scikit-learn
+# MATLAB & scikit-learn
 
 [![Call Python from MATLAB](https://github.com/yanndebray/matlab-with-scikit-learn/actions/workflows/matlab-engine.yml/badge.svg)](https://github.com/yanndebray/matlab-with-scikit-learn/actions/workflows/matlab-engine.yml)
 [![Live report](https://img.shields.io/badge/live%20report-yanndebray.github.io-4f46e5)](https://yanndebray.github.io/matlab-with-scikit-learn/)
@@ -69,12 +69,58 @@ CI installs MATLAB R2025b via `matlab-actions/setup-matlab`, runs
 `callPython.m` via `matlab-actions/run-command`, then `actions/deploy-pages`
 publishes `site/` to GitHub Pages.
 
+## Python-driven path — MATLAB Engine for Python
+
+`compare_engine.py` is the inverse pipeline: Python drives, attaching to a
+running shared MATLAB session via the
+[MATLAB Engine for Python](https://www.mathworks.com/help/matlab/matlab-engine-for-python.html).
+Same train/test split as `compare.py`, same skore framing, but it pulls
+posterior probabilities back out of MATLAB so ROC AUC / log loss / Brier are
+computed for the MATLAB side too.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Python<br/>(compare_engine.py)
+    participant M as MATLAB<br/>(shared session)
+
+    Note over P: get_split(dataset)<br/>fit sklearn estimator
+    P->>M: connect_matlab()
+    P->>M: workspace = X_train, y_train, X_test
+    P->>M: eval fitcecoc / fitctree / fitcknn / TreeBagger
+    P->>M: eval predict (labels + posteriors + ClassNames)
+    M-->>P: yhat, scores, class_names
+    Note over P: wrap MATLAB output in FrozenProbaClassifier<br/>build skore EstimatorReports<br/>ComparisonReport.metrics.summarize()
+```
+
+In MATLAB, expose the session once:
+
+```matlab
+>> matlab.engine.shareEngine
+```
+
+Then from Python:
+
+```python
+>>> import matlab.engine
+>>> m = matlab.engine.connect_matlab()
+>>> from compare_engine import run
+>>> run(m, dataset="iris", matlab_classifier="fitcecoc")
+```
+
+Or as a script:
+
+```bash
+python compare_engine.py --dataset wine --matlab-classifier 'TreeBagger(50)'
+```
+
 ## Repository layout
 
 | File                                  | Role                                                                  |
 | ------------------------------------- | --------------------------------------------------------------------- |
 | `callPython.m`                        | MATLAB entry point — trains the MATLAB fleet across all datasets.     |
 | `compare.py`                          | Dataset registry, sklearn fleet, skore reports, HTML site renderer.   |
+| `compare_engine.py`                   | Python entry point — drives a shared MATLAB session via the engine.   |
 | `.github/workflows/matlab-engine.yml` | CI: MATLAB + Python + skore + GitHub Pages deploy.                    |
 
 ## Run locally
@@ -82,7 +128,14 @@ publishes `site/` to GitHub Pages.
 Requires MATLAB R2025b (with Statistics & ML Toolbox) and Python 3.12:
 
 ```bash
-python3 -m pip install scikit-learn numpy matplotlib skore
+pip install scikit-learn numpy matplotlib skore
 matlab -batch "callPython"
 open site/index.html
+```
+
+For the Python-driven path, also install the MATLAB Engine for Python from
+your MATLAB install:
+
+```bash
+pip install matlabengine
 ```
