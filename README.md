@@ -123,6 +123,30 @@ python compare_engine.py --dataset wine --matlab-classifier 'TreeBagger(50)'
 | `compare.py`                          | Dataset registry, sklearn fleet, skore reports, HTML site renderer.   |
 | `compare_engine.py`                   | Python entry point — drives a shared MATLAB session via the engine.   |
 | `.github/workflows/matlab-engine.yml` | CI: MATLAB + Python + skore + GitHub Pages deploy.                    |
+| `callPython_runmat.m`                 | RunMat entry point — same benchmark, no MATLAB install.               |
+| `pybridge.py`, `+py/`, `PyObject.m`, `PyDict.m`, `pyargs.m` | The `py.*` interop bridge this branch adds for RunMat. |
+| `knnPredict.m`, `accuracy.m`          | Plain-MATLAB stand-ins for toolbox functions RunMat lacks.            |
+| `test_pyinterop.m`, `check.m`         | 29 checks over the bridge.                                            |
+| `RUNMAT.md`                           | How the port works, and the RunMat gaps it works around.              |
+
+## Running it on RunMat
+
+This branch also runs the whole thing on [RunMat](https://runmat.org), an
+open-source MATLAB runtime — no MATLAB install, no license. RunMat has no
+`py.*` interop of its own, so the branch ships one (`pybridge.py` plus `+py/`)
+and the driver calls Python through it:
+
+```bash
+pip install scikit-learn numpy matplotlib "skore<0.20"
+runmat test_pyinterop.m        # 29 interop checks
+runmat callPython_runmat.m     # the benchmark; writes site/index.html
+```
+
+The MATLAB side is currently `fitctree` (which RunMat ships) plus a
+plain-MATLAB k-NN, since `fitcecoc`, `fitcknn`, and `TreeBagger` have no RunMat
+equivalent yet. [RUNMAT.md](RUNMAT.md) covers the bridge's design, the API
+differences from MATLAB's `py.*`, and the fourteen RunMat bugs and gaps the
+port had to work around.
 
 ## Run locally
 
